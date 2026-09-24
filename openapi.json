@@ -1,0 +1,1236 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mutex Job Matrix Service",
+    "description": "Mutually-exclusive job matrix with draft / publish / effective-window versioning. Scheduling and starting decisions freeze the applicable matrix version and its conflict-judgment basis; later publishes only affect new decisions and never rewrite historical plans, receipts or audit records.",
+    "version": "2.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matrix/draft": {
+      "get": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "Read Draft",
+        "operationId": "read_draft_matrix_draft_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "Write Draft",
+        "operationId": "write_draft_matrix_draft_put",
+        "parameters": [
+          {
+            "name": "X-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matrix/versions": {
+      "get": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "List Versions",
+        "operationId": "list_versions_matrix_versions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VersionOut"
+                  },
+                  "title": "Response List Versions Matrix Versions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "Publish",
+        "operationId": "publish_matrix_versions_post",
+        "parameters": [
+          {
+            "name": "X-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay of an earlier publish with the same request_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matrix/versions/effective": {
+      "get": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "Effective Version",
+        "description": "Resolve which version governs a given instant (boundary selection).",
+        "operationId": "effective_version_matrix_versions_effective_get",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "At"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matrix/versions/{version_no}": {
+      "get": {
+        "tags": [
+          "matrix"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_matrix_versions__version_no__get",
+        "parameters": [
+          {
+            "name": "version_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version No"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/schedule": {
+      "post": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "Schedule",
+        "operationId": "schedule_jobs_schedule_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResultOut"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay of an earlier schedule request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/start": {
+      "post": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "Start",
+        "operationId": "start_jobs__job_id__start_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/decisions/evaluate": {
+      "post": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "Evaluate",
+        "description": "Dry-run conflict check against the currently effective version.\n\nPurely read-only: no plan is created and no decision is recorded.",
+        "operationId": "evaluate_decisions_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/decisions": {
+      "get": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "List Decisions",
+        "operationId": "list_decisions_decisions_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionOut"
+                  },
+                  "title": "Response List Decisions Decisions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/decisions/{decision_id}": {
+      "get": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "Get Decision",
+        "operationId": "get_decision_decisions__decision_id__get",
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Decision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/decisions/{decision_id}/replay": {
+      "post": {
+        "tags": [
+          "decisions"
+        ],
+        "summary": "Replay",
+        "description": "Replay a historical decision from its frozen snapshot (audit).",
+        "operationId": "replay_decisions__decision_id__replay_post",
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Decision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DecisionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "decision_kind": {
+            "type": "string",
+            "title": "Decision Kind"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "matrix_version_id": {
+            "type": "string",
+            "title": "Matrix Version Id"
+          },
+          "matrix_version_no": {
+            "type": "integer",
+            "title": "Matrix Version No"
+          },
+          "matrix_rules_hash": {
+            "type": "string",
+            "title": "Matrix Rules Hash"
+          },
+          "matrix_rules_snapshot": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Matrix Rules Snapshot"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "planned_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned Start"
+          },
+          "planned_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned End"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "conflicts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "frozen_context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Frozen Context"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "decision_kind",
+          "decided_at",
+          "matrix_version_id",
+          "matrix_version_no",
+          "matrix_rules_hash",
+          "matrix_rules_snapshot",
+          "job_id",
+          "job_type",
+          "resources",
+          "planned_start",
+          "planned_end",
+          "status",
+          "conflicts",
+          "reason",
+          "frozen_context",
+          "request_id"
+        ],
+        "title": "DecisionOut"
+      },
+      "DraftIn": {
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleIn"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "title": "DraftIn"
+      },
+      "DraftOut": {
+        "properties": {
+          "rules": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "type": "string",
+            "title": "Updated By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "DraftOut"
+      },
+      "EvaluateIn": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Job Type"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "planned_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned Start"
+          },
+          "planned_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "planned_start",
+          "planned_end"
+        ],
+        "title": "EvaluateIn"
+      },
+      "EvaluateOut": {
+        "properties": {
+          "decision_kind": {
+            "type": "string",
+            "title": "Decision Kind"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "matrix_version_no": {
+            "type": "integer",
+            "title": "Matrix Version No"
+          },
+          "matrix_rules_hash": {
+            "type": "string",
+            "title": "Matrix Rules Hash"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "conflicts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_kind",
+          "decided_at",
+          "matrix_version_no",
+          "matrix_rules_hash",
+          "status",
+          "conflicts",
+          "reason"
+        ],
+        "title": "EvaluateOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "HealthOut"
+      },
+      "JobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "planned_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned Start"
+          },
+          "planned_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned End"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_type",
+          "resources",
+          "planned_start",
+          "planned_end",
+          "status",
+          "request_id",
+          "created_at"
+        ],
+        "title": "JobOut"
+      },
+      "PublishIn": {
+        "properties": {
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective From"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "effective_from"
+        ],
+        "title": "PublishIn"
+      },
+      "ReplayOut": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "decision_kind": {
+            "type": "string",
+            "title": "Decision Kind"
+          },
+          "matrix_version_no": {
+            "type": "integer",
+            "title": "Matrix Version No"
+          },
+          "matrix_rules_hash": {
+            "type": "string",
+            "title": "Matrix Rules Hash"
+          },
+          "snapshot_intact": {
+            "type": "boolean",
+            "title": "Snapshot Intact"
+          },
+          "original_status": {
+            "type": "string",
+            "title": "Original Status"
+          },
+          "replayed_status": {
+            "type": "string",
+            "title": "Replayed Status"
+          },
+          "replayed_conflicts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Replayed Conflicts"
+          },
+          "matches_original": {
+            "type": "boolean",
+            "title": "Matches Original"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "decision_kind",
+          "matrix_version_no",
+          "matrix_rules_hash",
+          "snapshot_intact",
+          "original_status",
+          "replayed_status",
+          "replayed_conflicts",
+          "matches_original"
+        ],
+        "title": "ReplayOut"
+      },
+      "RuleIn": {
+        "properties": {
+          "job_type_a": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Job Type A"
+          },
+          "job_type_b": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Job Type B"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type_a",
+          "job_type_b"
+        ],
+        "title": "RuleIn"
+      },
+      "ScheduleIn": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Job Type"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "planned_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned Start"
+          },
+          "planned_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned End"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "planned_start",
+          "planned_end"
+        ],
+        "title": "ScheduleIn"
+      },
+      "ScheduleResultOut": {
+        "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionOut"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "decision",
+          "replayed"
+        ],
+        "title": "ScheduleResultOut"
+      },
+      "StartResultOut": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/JobOut"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "decision"
+        ],
+        "title": "StartResultOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VersionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "rules_hash": {
+            "type": "string",
+            "title": "Rules Hash"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "published_by": {
+            "type": "string",
+            "title": "Published By"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_no",
+          "rules",
+          "rules_hash",
+          "effective_from",
+          "effective_to",
+          "published_at",
+          "published_by",
+          "source",
+          "request_id"
+        ],
+        "title": "VersionOut"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "matrix",
+      "description": "Mutex matrix drafts, versions and publishing"
+    },
+    {
+      "name": "decisions",
+      "description": "Scheduling/starting decisions with frozen snapshots"
+    }
+  ]
+}
