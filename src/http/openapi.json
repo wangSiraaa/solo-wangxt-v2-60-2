@@ -1,0 +1,1006 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mutual-Exclusion Job Matrix API",
+    "version": "1.0.0",
+    "description": "Versioned mutex job matrix: drafts, publish with effective time, immutable decision snapshots, and historical replay. Published matrix versions form disjoint half-open effective windows [effective_at, superseded_at); every planning decision freezes the version and conflict basis it was judged against."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Drafts"
+    },
+    {
+      "name": "Versions"
+    },
+    {
+      "name": "Plans"
+    },
+    {
+      "name": "Audit"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "MatrixRule": {
+        "type": "object",
+        "required": [
+          "resource",
+          "job_types"
+        ],
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "Resource name, or '*' for a rule matching every resource.",
+            "example": "crane-a"
+          },
+          "job_types": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "lift",
+              "paint"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "mutex"
+            ],
+            "default": "mutex"
+          }
+        }
+      },
+      "Matrix": {
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ],
+            "default": 1
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatrixRule"
+            }
+          }
+        }
+      },
+      "MatrixVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "version_no": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Null while draft; assigned at publish."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matrix": {
+            "$ref": "#/components/schemas/Matrix"
+          },
+          "matrix_hash": {
+            "type": "string",
+            "description": "sha256 hex of the canonical matrix JSON."
+          },
+          "effective_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "superseded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Null for the version currently in force."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ConflictBasis": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "job_type": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "object",
+            "properties": {
+              "rule_index": {
+                "type": "integer"
+              },
+              "resource": {
+                "type": "string"
+              },
+              "job_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "mutex"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "PlanDecision": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "decision_kind": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "start_confirmed",
+              "conflict"
+            ]
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "job_type": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "planned_start_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "planned_end_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "matrix_version_id": {
+            "type": "integer"
+          },
+          "matrix_version_no": {
+            "type": "integer"
+          },
+          "matrix_hash": {
+            "type": "string"
+          },
+          "matrix_snapshot": {
+            "$ref": "#/components/schemas/Matrix"
+          },
+          "conflict_basis": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConflictBasis"
+            }
+          },
+          "conflicting_job_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request_idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PlanReplay": {
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "$ref": "#/components/schemas/PlanDecision"
+          },
+          "replay": {
+            "type": "object",
+            "properties": {
+              "matrix_version_no": {
+                "type": "integer"
+              },
+              "stored_hash": {
+                "type": "string"
+              },
+              "recomputed_hash": {
+                "type": "string"
+              },
+              "hash_match": {
+                "type": "boolean"
+              },
+              "basis": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConflictBasis"
+                }
+              },
+              "conflicting_job_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "basis_matches_record": {
+                "type": "boolean"
+              },
+              "receipt_preserved": {
+                "type": "boolean"
+              },
+              "replay_matches": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "OVERLAPPING_EFFECTIVE_WINDOW"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness and current server time",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "This OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/matrix/drafts": {
+      "get": {
+        "tags": [
+          "Drafts"
+        ],
+        "summary": "List drafts",
+        "responses": {
+          "200": {
+            "description": "Drafts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "drafts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MatrixVersion"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Drafts"
+        ],
+        "summary": "Create a draft matrix",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "matrix"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "matrix": {
+                    "$ref": "#/components/schemas/Matrix"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid matrix",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/matrix/drafts/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Drafts"
+        ],
+        "summary": "Get a draft",
+        "responses": {
+          "200": {
+            "description": "Draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Drafts"
+        ],
+        "summary": "Replace a draft's matrix",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "matrix"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "matrix": {
+                    "$ref": "#/components/schemas/Matrix"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/matrix/drafts/{id}/publish": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Drafts"
+        ],
+        "summary": "Publish a draft at an effective time",
+        "description": "Assigns the next version number and opens effective window [effective_at, infinity), closing the previous open window. Overlapping windows are rejected (409 OVERLAPPING_EFFECTIVE_WINDOW). Retrying with the same idempotency_key returns the already-published version (200).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idempotency_key"
+                ],
+                "properties": {
+                  "effective_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Defaults to current server time. Must be strictly later than the newest published effective_at."
+                  },
+                  "idempotency_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay of an earlier publish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/MatrixVersion"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (e.g. missing idempotency_key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Overlapping effective window, duplicate publish, or already published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/matrix/versions": {
+      "get": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "List published versions with effective windows",
+        "responses": {
+          "200": {
+            "description": "Versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MatrixVersion"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/matrix/versions/current": {
+      "get": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "Version in force now",
+        "responses": {
+          "200": {
+            "description": "Current version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/matrix/versions/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Numeric row id or version_no."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "Get a published version (historical snapshot)",
+        "responses": {
+          "200": {
+            "description": "Version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixVersion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "List decisions (frozen plans/conflicts/receipts)",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Decisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "decisions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PlanDecision"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "Schedule or start a job",
+        "description": "Resolves the matrix version in force at planned_start_at, evaluates conflicts with only that version, and appends an immutable decision carrying the full matrix snapshot and conflict basis. Conflicting submissions are recorded as outcome=conflict (HTTP 409). Same idempotency_key replays the original decision (HTTP 200).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "job_id",
+                  "job_type",
+                  "resource"
+                ],
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "job_type": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
+                  "planned_start_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Defaults to now; also selects the matrix version in force (cross-boundary)."
+                  },
+                  "planned_end_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Defaults to start + 60 minutes."
+                  },
+                  "decision_kind": {
+                    "type": "string",
+                    "enum": [
+                      "scheduled",
+                      "start_confirmed"
+                    ],
+                    "default": "scheduled"
+                  },
+                  "idempotency_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDecision"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Accepted (scheduled/start_confirmed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict (decision still recorded) or duplicate job_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDecision"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Decision id or job_id."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "Get a frozen decision receipt",
+        "responses": {
+          "200": {
+            "description": "Decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDecision"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans/{id}/replay": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Decision id or job_id."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "Replay a historical decision against its frozen snapshot",
+        "description": "Recomputes the conflict basis from the matrix_snapshot stored on the decision, verifies its sha256, and reports whether the historical conclusion reproduces. Works identically after restart since everything needed is persisted.",
+        "responses": {
+          "200": {
+            "description": "Replay result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanReplay"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/events": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Query audit events (draft lifecycle, publish, decisions)",
+        "parameters": [
+          {
+            "name": "aggregate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "matrix_version",
+                "plan_decision"
+              ]
+            }
+          },
+          {
+            "name": "aggregate_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "event_type": {
+                            "type": "string"
+                          },
+                          "aggregate": {
+                            "type": "string"
+                          },
+                          "aggregate_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "payload": {
+                            "type": "object"
+                          },
+                          "occurred_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
